@@ -1,6 +1,7 @@
 package com.example.JWTtoken.security;
 
 import com.example.JWTtoken.filter.CustomAuthenticationFilter;
+import com.example.JWTtoken.filter.CustomAuthorizationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -14,6 +15,10 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import static org.springframework.http.HttpMethod.GET;
+import static org.springframework.http.HttpMethod.POST;
 
 @Configuration
 @EnableWebSecurity
@@ -36,10 +41,23 @@ public class SecurityConfig {
 
     @Bean
     protected SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
+
+        CustomAuthenticationFilter customAuthenticationFilter =
+                new CustomAuthenticationFilter(authenticationManager());
+        customAuthenticationFilter.setFilterProcessesUrl("/api/login");
+
         httpSecurity.csrf().disable();
         httpSecurity.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
-        httpSecurity.authorizeHttpRequests().anyRequest().permitAll();
-        httpSecurity.addFilter(new CustomAuthenticationFilter(authenticationManager()));
+        httpSecurity.authorizeHttpRequests().requestMatchers("/api/login/**").permitAll();
+        httpSecurity.authorizeHttpRequests().requestMatchers(GET, "/api/user/**")
+                .hasAnyAuthority("ROLE_USER");
+        httpSecurity.authorizeHttpRequests().requestMatchers(POST, "/api/user/save/**")
+                .hasAnyAuthority("ROLE_ADMIN");
+        httpSecurity.authorizeHttpRequests().anyRequest().authenticated();
+        httpSecurity.addFilter(customAuthenticationFilter);
+        httpSecurity.addFilterBefore(
+                new CustomAuthorizationFilter(), UsernamePasswordAuthenticationFilter.class
+        );
 
         return httpSecurity.build();
     }
